@@ -21,4 +21,4 @@ if __name__ == '__main__':
     agent = create_agent(model=llm)
     message = {"messages": [HumanMessage("介绍一下三体这本书")]}
     response = direct_main(message, agent)
-    print(response)
+    print(response[0]['text'])

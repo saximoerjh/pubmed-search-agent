@@ -112,7 +112,7 @@ def extract_boxed_answer(agent_result: Any) -> Optional[str]:
 
     # 2) 提取 \\boxed{...}
     # 支持内容中出现换行；非贪婪匹配 boxed 内部
-    m = re.search(r"\\boxed\{([\s\S]*?)\}", content)
+    m = re.search(r"\\boxed\{([\s\S]*?)}", content)
     if m:
         return m.group(1).strip()
 
