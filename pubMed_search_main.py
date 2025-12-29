@@ -13,10 +13,14 @@ import string
 import time
 import jieba
 import requests
+import asyncio
 import concurrent.futures
 from typing import Tuple, Optional
 from tqdm import tqdm
 from concurrent.futures.thread import ThreadPoolExecutor
+from pubmed_utils.pubmed_fetch import PubMedFetch
+
+
 
 
 class customRetriever(PubMedRetriever):
@@ -114,7 +118,7 @@ class customRetriever(PubMedRetriever):
         text_dict = self.parse(xml_text)
         ret_dict =  self._parse_article(uid, text_dict)
         # 加入url字段
-        ret_dict["url"] = url
+        ret_dict["url"] = ret_dict["uid"]
         return ret_dict
 
 
@@ -125,6 +129,7 @@ class NCBIRetriever():
         if os.getenv("PUBMED_API_KEY") is None:
             raise ValueError("PUBMED_API_KEY environment variable not set")
         self.retriever = customRetriever(api_key=os.getenv("PUBMED_API_KEY"))
+        self.fetcher = PubMedFetch()
 
     def web_search(self, query: str, top_k_results: int = 3, MAX_QUERY_LENGTH: int = 2000) -> list[Document]:
         """
@@ -153,29 +158,9 @@ class NCBIRetriever():
             str: Extracted text or context.
         """
         try:
-            retry = 0
-            while True:
-                try:
-                    result = urllib.request.urlopen(url)
-                    break
-                except urllib.error.HTTPError as e:
-                    if e.code == 429 and retry < self.retriever.max_retry:
-                        # Too Many Requests errors
-                        # wait for an exponentially increasing amount of time
-                        print(  # noqa: T201
-                            f"Too Many Requests, "
-                            f"waiting for {self.retriever.sleep_time:.2f} seconds..."
-                        )
-                        time.sleep(self.retriever.sleep_time)
-                        self.retriever.sleep_time *= 2
-                        retry += 1
-                    else:
-                        raise e
 
-            xml_text = result.read().decode("utf-8")
-            text_dict = self.retriever.parse(xml_text)
-            # TODO: 这里需要根据实际的网页结构进行调整获取text
-            text = text_dict.get("content", "")
+            # 将URL即为检索用pmid
+            text = asyncio.run(self.fetcher.get_full_text(pmid=url))
 
             if snippet:
                 # 通过摘要提取相关内容（因为文本根据摘要进行匹配）
@@ -323,3 +308,7 @@ for info in useful_info:
     print(f"URL: {info['url']}")
     print(f"Date: {info['date']}")
     print(f"Snippet: {info['snippet']}")
+
+# 获取全文内容
+full_text = retrieverManager.extract_text_from_url(useful_info[1]['url'], useful_info[1]['snippet'])
+print(full_text)
